@@ -60,16 +60,96 @@ function GuessConfig([string]$name) {
     return 'FLD'
 }
 
+# 清除临时目录
+function Clear-TempPath {
+    if (Test-Path $tempPath) {
+        Get-ChildItem -LiteralPath $tempPath | ForEach-Object {
+            Remove-Item -Recurse -Force -LiteralPath $PSItem
+        }
+    } else {
+        $null = mkdir $tempPath
+    }
+}
+
+function Expand-Zip($source, $target) {
+    if ($IsMacOS) {
+        $allargs = @(
+            $source,
+            '-d',
+            $target
+        )
+        if ($VerbosePreference -eq 'SilentlyContinue') {
+            $allargs += '-q' # 静默
+        }
+        $InformationPreference = 'Continue'
+        &'unzip' $allargs
+        $exitCodes = @{
+            0='normal; no errors or warnings detected.'
+            2='unexpected end of zip file.'
+            3='a generic error in the zipfile format was detected.  Pro-cessing may have completed successfully anyway; some bro-ken zipfiles created by other archivers have simple work-arounds.'
+            4='zip was unable to allocate memory for one or more buffersduring program initialization.'
+            5='a severe error in the zipfile format was detected.   Pro-cessing probably failed immediately.'
+            6='entry  too  large  to  be  processed (such as input fileslarger than 2 GB when not using Zip64 or trying  to  readan existing archive that is too large) or entry too largeto be split with zipsplit'
+            7='invalid comment format'
+            8='zip -T failed or out of memory'
+            9='the user aborted zip prematurely with control-C (or simi-lar)'
+            10='zip encountered an error while using a temp file'
+            11='read or seek error'
+            12='zip has nothing to do'
+            13='missing or empty zip file'
+            14='error writing to a file'
+            15='zip was unable to create a file to write to'
+            16='bad command line parameters'
+            18='zip could not open a specified file to read'
+            19='zip  was compiled with options not supported on this sys-tem'
+        }
+        
+        switch ($LASTEXITCODE) {
+            0 {
+                Write-Output "解压成功"
+                $success = $true
+            }
+            Default {
+                if ($exitCodes.ContainsKey($LASTEXITCODE)) {
+                    Write-Warning $exitCodes.$LASTEXITCODE
+                } else {
+                    Write-Warning "未知错误-$LASTEXITCODE"
+                }
+            }
+        } # of switch
+    } else {
+        $result = Expand-Archive -LiteralPath $source -DestinationPath $target -Force -PassThru -ErrorAction SilentlyContinue
+        if ($result) {
+            Write-Output '解压成功'
+            $success = $true
+        } else {
+            Write-Warning '解压失败'
+        }
+    } # of if OS..
+}
+
+function Remove-RedundantDir($target) {
+    $innerDir = $target
+    # 钻取最深的独立目录
+    while ((Get-ChildItem $innerDir -Directory).Length -eq 1 -and (Get-ChildItem $innerDir -File).Length -eq 0 -and (!(Get-ChildItem $innerDir)[0].Name.EndsWith('.app'))) {
+        $innerDir = (Get-ChildItem $innerDir)[0]
+    }
+    Write-Debug $innerDir
+    if ($innerDir -ne $target) {
+        $firstLevelSubdir = (Get-ChildItem $target)[0]
+        Write-Debug "降低目录层级 $innerDir -> $target"
+        Get-ChildItem -LiteralPath $innerDir.FullName | ForEach-Object {
+            Move-Item -LiteralPath $PSItem $target
+        }
+        Remove-Item -Force -Recurse -LiteralPath $firstLevelSubdir
+    }
+}
+
 # main script
 
 # 清除临时目录
-if (Test-Path $tempPath) {
-    Get-ChildItem -LiteralPath $tempPath | ForEach-Object {
-        Remove-Item -Recurse -Force -LiteralPath $PSItem
-    }
-} else {
-    $null = mkdir $tempPath
-}
+
+Clear-TempPath
 
 # 删除百度云生成的临时文件。这些文件会影响解压。正常下载完的目录里不该有这些文件。
 Get-ChildItem $inputPath -Include *.baiduyun.downloading -Recurse | Remove-Item
@@ -226,65 +306,32 @@ foreach ($subdir in $subdirs) {
                             }
                         }
                     }
-                    if ($success) { break }
+                    if ($success) { 
+                        # 修正某些 _zip 格式的文件，为 .zip 文件。
+                        $files = Get-ChildItem -File -Recurse temp/
+                        if ($files.Count -eq 1 -and ([string]$files[0]).EndsWith('_zip')) {
+                            Write-Output "解开 $($files[0])"
+                            $zipTarget = ([System.IO.FileInfo]$files[0]).FullName.Replace('_zip', '.zip')
+                            Move-Item -LiteralPath $files[0] $zipTarget
+                            
+                            # 去掉 ".zip" 结尾
+                            $zipFolder = $zipTarget.Substring(0, $zipTarget.Length - 4) + '/'
+                            
+                            Write-Output "准备解压 $zipTarget"
+                            if (Expand-Zip $zipTarget $zipFolder) {
+                                # 解压成功，删除临时的 ZIP 文件。
+                                Write-Output "准备移动 $zipTarget"
+                                Remove-Item -LiteralPath $zipTarget
+                                Write-Output "移动完毕 $zipTarget"
+                            }
+                        }
+                        break
+                    }
                 }
              }
             '.zip' {
                 # 解压 zip 格式子目录
-                if ($IsMacOS) {
-                    
-                    $allargs = @(
-                        $source,
-                        '-d',
-                        $target
-                    )
-                    if ($VerbosePreference -eq 'SilentlyContinue') {
-                        $allargs += '-q' # 静默
-                    }
-                    & 'unzip' $allargs
-                    $exitCodes = @{
-                        0='normal; no errors or warnings detected.'
-                        2='unexpected end of zip file.'
-                        3='a generic error in the zipfile format was detected.  Pro-cessing may have completed successfully anyway; some bro-ken zipfiles created by other archivers have simple work-arounds.'
-                        4='zip was unable to allocate memory for one or more buffersduring program initialization.'
-                        5='a severe error in the zipfile format was detected.   Pro-cessing probably failed immediately.'
-                        6='entry  too  large  to  be  processed (such as input fileslarger than 2 GB when not using Zip64 or trying  to  readan existing archive that is too large) or entry too largeto be split with zipsplit'
-                        7='invalid comment format'
-                        8='zip -T failed or out of memory'
-                        9='the user aborted zip prematurely with control-C (or simi-lar)'
-                        10='zip encountered an error while using a temp file'
-                        11='read or seek error'
-                        12='zip has nothing to do'
-                        13='missing or empty zip file'
-                        14='error writing to a file'
-                        15='zip was unable to create a file to write to'
-                        16='bad command line parameters'
-                        18='zip could not open a specified file to read'
-                        19='zip  was compiled with options not supported on this sys-tem'
-                    }
-                    
-                    switch ($LASTEXITCODE) {
-                        0 {
-                            Write-Output "解压成功"
-                            $success = $true
-                        }
-                        Default {
-                            if ($exitCodes.ContainsKey($LASTEXITCODE)) {
-                                Write-Warning $exitCodes.$LASTEXITCODE
-                            } else {
-                                Write-Warning "未知错误-$LASTEXITCODE"
-                            }
-                        }
-                    } # of switch
-                } else {
-                    $result = Expand-Archive -LiteralPath $source -DestinationPath $target -Force -PassThru -ErrorAction SilentlyContinue
-                    if ($result) {
-                        Write-Output '解压成功'
-                        $success = $true
-                    } else {
-                        Write-Warning '解压失败'
-                    }
-                } # of if OS..
+                $success = Expand-Zip($source, $target)
              }
              { '.dmg', '.iso' -contains $PSItem } {
                 # 只含 DMG/ISO 镜像，直接移动文件夹
@@ -338,20 +385,7 @@ foreach ($subdir in $subdirs) {
 
     # 降低目录层级
     if (Test-Path $target) {
-        $innerDir = $target
-        # 钻取最深的独立目录
-        while ((Get-ChildItem $innerDir -Directory).Length -eq 1 -and (Get-ChildItem $innerDir -File).Length -eq 0 -and (!(Get-ChildItem $innerDir)[0].Name.EndsWith('.app'))) {
-            $innerDir = (Get-ChildItem $innerDir)[0]
-        }
-        Write-Debug $innerDir
-        if ($innerDir -ne $target) {
-            $firstLevelSubdir = (Get-ChildItem $target)[0]
-            Write-Debug "降低目录层级 $innerDir -> $target"
-            Get-ChildItem -LiteralPath $innerDir.FullName | ForEach-Object {
-                Move-Item -LiteralPath $PSItem $target
-            }
-            Remove-Item -Force -Recurse -LiteralPath $firstLevelSubdir
-        }
+        Remove-RedundantDir $target
 
         # 根据重打包策略重打包
         switch ($configs[$subdir.Name]) {
