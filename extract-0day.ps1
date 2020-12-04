@@ -331,7 +331,14 @@ foreach ($subdir in $subdirs) {
              }
             '.zip' {
                 # 解压 zip 格式子目录
-                $success = Expand-Zip($source, $target)
+                if ($files.Count -eq 1) {
+                    # 只有一个 ZIP 文件
+                    $source = $files[0]
+                    $success = Expand-Zip $source.FullName $target
+                } else {
+                    Write-Warning "不支持多个 ZIP 文件 - $($subdir)"
+                    $success = $false
+                }
              }
              { '.dmg', '.iso' -contains $PSItem } {
                 # 只含 DMG/ISO 镜像，直接移动文件夹
