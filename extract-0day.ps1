@@ -408,12 +408,15 @@ foreach ($subdir in $subdirs) {
                             '-r', # recurse into directories
                             '-m', # move into zipfile (delete OS files)
                             $zipPath,
-                            $target
+                            '*'
                         )
                         if ($VerbosePreference -eq 'SilentlyContinue') {
                             $allargs += '-q' # 静默
                         }
+                        Push-Location
+                        Set-Location $target
                         & 'zip' $allargs
+                        Pop-Location
                         $exitCodes = @{
                             0='normal; no errors or warnings detected.'
                             2='unexpected end of zip file.'
