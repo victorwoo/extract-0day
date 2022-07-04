@@ -49,7 +49,14 @@ Desktop.ini
 
 function GuessConfig([string]$name) {
     Write-Debug $name
-    if ($name -cmatch '\W(?i:macos(x?))$|\W(?i:for mac(?:os)?)') { return 'DMG' }
+    if ($name -cmatch '\W(?i:macos(x?))$|\W(?i:mac(x?))$|\W(?i:mas(x?))$|\W(?i:for mac(?:os)?)') { return 'DMG' }
+    if ($name -cmatch 'Topaz') { return 'ISO'}
+    if ($name -cmatch 'Antidote') { return 'ISO'}
+    if ($name -cmatch 'Red Giant') { return 'ISO'}
+    if ($name -cmatch 'Luminar') { return 'ISO'}
+    if ($name -cmatch 'JetBrains') { return 'ISO'}
+    if ($name -cmatch 'Capture One') { return 'ISO'}
+    if ($name -cmatch 'SAPIEN') { return 'ISO'}
     if ($name -match '\W(Multilingual)|(Multilanguage)|(x64)|(x86)|(win)|(Build)|(V?(\d+)(\.\d+)+)\W') {
         if ($name -cmatch '^Adobe ') {
             return 'ISO'
