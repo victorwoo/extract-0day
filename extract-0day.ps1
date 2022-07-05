@@ -15,6 +15,11 @@
 # apt-get install hfsprogs （未使用）
 # https://askubuntu.com/questions/1117461/how-do-i-create-a-dmg-file-on-linux-ubuntu-for-macos
 
+param(
+    # 是否需要人工确认每项 0day 软件的处理方式
+    [switch]$NeedConfirm = $false
+)
+
 # 调试参数
 $ErrorActionPreference = 'Inquire'
 $DebugPreference = 'Continue'
@@ -185,43 +190,45 @@ foreach ($subdir in $subdirs) {
 
 $configs | ForEach-Object{ [PSCustomObject]$_ } | Export-CSV -Path $configFile
 
-$confirmedConfig = $false
-do {
-    $title = 'Is it OK?'
-    $message = $configs.GetEnumerator() | Sort-Object -Property Name | Format-Table -AutoSize | Out-String
-
-    $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Yes"
-    $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", "No"
-
-    $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
-    $result = $host.ui.PromptForChoice($title, $message, $options, 0)
-
-    if ($result -eq 0) {
-        # 选择了 Yes
-        $confirmedConfig = $true
-    } else {
-        # 选择了 No
-        foreach ($subdir in $subdirs) {
-            $title = 'How to process'
-            $message = $subdir.Name
-
-            $folder = New-Object System.Management.Automation.Host.ChoiceDescription "&Folder", "Folder"
-            $zip = New-Object System.Management.Automation.Host.ChoiceDescription "&ZIP", "ZIP Archive"
-            $dmg = New-Object System.Management.Automation.Host.ChoiceDescription "&DMG", "DMG Archive"
-            $iso = New-Object System.Management.Automation.Host.ChoiceDescription "&ISO", "ISO Archive"
-
-            $options = [System.Management.Automation.Host.ChoiceDescription[]]($folder, $zip, $dmg, $iso)
-
-            $methods = @('FLD', 'ZIP', 'DMG', 'ISO')
-            $defaultIndex = $methods.IndexOf($configs[$subdir.Name])
-            $result = $host.ui.PromptForChoice($title, $message, $options, $defaultIndex)
-            $configs[$subdir.Name] = $methods[$result]
+if ($NeedConfirm) {
+    $confirmedConfig = $false
+    do {
+        $title = 'Is it OK?'
+        $message = $configs.GetEnumerator() | Sort-Object -Property Name | Format-Table -AutoSize | Out-String
+    
+        $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Yes"
+        $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", "No"
+    
+        $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
+        $result = $host.ui.PromptForChoice($title, $message, $options, 0)
+    
+        if ($result -eq 0) {
+            # 选择了 Yes
+            $confirmedConfig = $true
+        } else {
+            # 选择了 No
+            foreach ($subdir in $subdirs) {
+                $title = 'How to process'
+                $message = $subdir.Name
+    
+                $folder = New-Object System.Management.Automation.Host.ChoiceDescription "&Folder", "Folder"
+                $zip = New-Object System.Management.Automation.Host.ChoiceDescription "&ZIP", "ZIP Archive"
+                $dmg = New-Object System.Management.Automation.Host.ChoiceDescription "&DMG", "DMG Archive"
+                $iso = New-Object System.Management.Automation.Host.ChoiceDescription "&ISO", "ISO Archive"
+    
+                $options = [System.Management.Automation.Host.ChoiceDescription[]]($folder, $zip, $dmg, $iso)
+    
+                $methods = @('FLD', 'ZIP', 'DMG', 'ISO')
+                $defaultIndex = $methods.IndexOf($configs[$subdir.Name])
+                $result = $host.ui.PromptForChoice($title, $message, $options, $defaultIndex)
+                $configs[$subdir.Name] = $methods[$result]
+            }
         }
-    }
+    } while (-not $confirmedConfig)
+}
 
-    # 写入 csv 文件
-    $configs | ForEach-Object{ [PSCustomObject]$_ } | Export-CSV -Path $configFile
-} while (-not $confirmedConfig)
+# 写入 csv 文件
+$configs | ForEach-Object{ [PSCustomObject]$_ } | Export-CSV -Path $configFile
 
 # 循环处理所有子目录
 
