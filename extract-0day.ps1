@@ -53,7 +53,7 @@ Desktop.ini
 
 # functions
 
-function GuessConfig([string]$name, [int]$size) {
+function GuessConfig([string]$name, [int64]$size) {
     Write-Debug $name
     if ($name -cmatch '\W(?i:macos(x?))$|\W(?i:mac(x?))$|\W(?i:mas(x?))$|\W(?i:for mac(?:os)?)') { return 'DMG' }
     if ($name -cmatch 'Topaz') { return 'ISO'}
