@@ -17,7 +17,7 @@
 
 param(
     # 是否需要人工确认每项 0day 软件的处理方式
-    [switch]$NeedConfirm = $true
+    [switch]$NeedConfirm = $false
 )
 
 # 调试参数
