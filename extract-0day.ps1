@@ -17,7 +17,7 @@
 
 param(
     # 是否需要人工确认每项 0day 软件的处理方式
-    [switch]$NeedConfirm = $false
+    [switch]$NeedConfirm = $true
 )
 
 # 调试参数
@@ -35,6 +35,7 @@ $configFile = 'config.csv'
 
 # 压缩文件密码清单
 $passwords = @('0daydown')
+$thresholdOfJudgeAsISO = 200MB
 
 # 垃圾文件黑名单
 $ignoredFiles = @'
@@ -52,7 +53,7 @@ Desktop.ini
 
 # functions
 
-function GuessConfig([string]$name) {
+function GuessConfig([string]$name, [int]$size) {
     Write-Debug $name
     if ($name -cmatch '\W(?i:macos(x?))$|\W(?i:mac(x?))$|\W(?i:mas(x?))$|\W(?i:for mac(?:os)?)') { return 'DMG' }
     if ($name -cmatch 'Topaz') { return 'ISO'}
@@ -62,6 +63,7 @@ function GuessConfig([string]$name) {
     if ($name -cmatch 'JetBrains') { return 'ISO'}
     if ($name -cmatch 'Capture One') { return 'ISO'}
     if ($name -cmatch 'SAPIEN') { return 'ISO'}
+    if ($size -gt $thresholdOfJudgeAsISO) { return 'ISO' }
     if ($name -match '\W(Multilingual)|(Multilanguage)|(x64)|(x86)|(win)|(Build)|(V?(\d+)(\.\d+)+)\W') {
         if ($name -cmatch '^Adobe ') {
             return 'ISO'
@@ -184,7 +186,8 @@ foreach ($subdir in $subdirs) {
         # 配置文件中有配置项
         $configs[$subdir.Name] = $config
     } else {
-        $configs[$subdir.Name] = GuessConfig $subdir.Name
+        $size = Get-ChildItem $subdir -Recurse | Measure-Object -Property length -Sum | Select-Object -Expand Sum
+        $configs[$subdir.Name] = GuessConfig $subdir.Name $size
     }
 }
 
