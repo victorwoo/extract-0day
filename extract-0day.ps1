@@ -63,7 +63,7 @@ function GuessConfig([string]$name, [int64]$size) {
     if ($name -cmatch 'JetBrains') { return 'ISO'}
     if ($name -cmatch 'Capture One') { return 'ISO'}
     if ($name -cmatch 'SAPIEN') { return 'ISO'}
-    if ($size -gt $thresholdOfJudgeAsISO) { return 'ISO' }
+    if ($size -gt $thresholdOfJudgeAsISO -and $name -cnotmatch '\Wv?\d+(\.\d+)*\W') { return 'ISO' }
     if ($name -match '\W(Multilingual)|(Multilanguage)|(x64)|(x86)|(win)|(Build)|(V?(\d+)(\.\d+)+)\W') {
         if ($name -cmatch '^Adobe ') {
             return 'ISO'
