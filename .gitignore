@@ -5,3 +5,4 @@ temp/*
 problem/*
 config.csv
 *.DS_Store
+*._.*

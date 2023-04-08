@@ -49,6 +49,7 @@ ehthumbs.db
 ehthumbs_vista.db
 desktop.ini
 Desktop.ini
+0daydown.url
 '@.Split("`n") | ForEach-Object { $PSItem.Trim() }
 
 # functions
@@ -63,7 +64,9 @@ function GuessConfig([string]$name, [int64]$size) {
     if ($name -cmatch 'JetBrains') { return 'ISO'}
     if ($name -cmatch 'Capture One') { return 'ISO'}
     if ($name -cmatch 'SAPIEN') { return 'ISO'}
-    if ($size -gt $thresholdOfJudgeAsISO -and $name -cnotmatch '\Wv?\d+(\.\d+)*\W') { return 'ISO' }
+    if ($name -cmatch 'Telerik') { return 'ISO'}
+    if ($name -cmatch 'Reg Organizer') { return 'ZIP'}
+    if ($size -gt $thresholdOfJudgeAsISO -and $name -cmatch '\wv?\d+(\.\d+)+\w') { return 'ISO' }
     if ($name -match '\W(Multilingual)|(Multilanguage)|(x64)|(x86)|(win)|(Build)|(V?(\d+)(\.\d+)+)\W') {
         if ($name -cmatch '^Adobe ') {
             return 'ISO'
